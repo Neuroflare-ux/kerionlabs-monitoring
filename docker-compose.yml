@@ -1,0 +1,36 @@
+name: kerionlabs
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus:ro,Z
+      - prom_data:/prometheus
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - --path.rootfs=/host
+    network_mode: host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    security_opt:
+      - label=disable
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set it in .env}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped  
+volumes:
+  prom_data:
+  grafana_data:
