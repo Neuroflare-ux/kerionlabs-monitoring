@@ -3,8 +3,7 @@ name: kerionlabs
 services:
   prometheus:
     image: prom/prometheus:v2.55.1
-    ports:
-      - "9091:9090"
+    
     volumes:
       - ./prometheus:/etc/prometheus:ro,Z
       - prom_data:/prometheus
@@ -23,14 +22,31 @@ services:
       - label=disable
     restart: unless-stopped
   grafana:
-    image: grafana/grafana:11.3.0
-    ports:
-      - "3000:3000"
+    image: grafana/grafana:latest
+    
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set it in .env}
     volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
       - grafana_data:/var/lib/grafana
+    restart: unless-stopped 
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - grafana
+      - prometheus
     restart: unless-stopped  
+    
 volumes:
   prom_data:
   grafana_data:
+
+ 
