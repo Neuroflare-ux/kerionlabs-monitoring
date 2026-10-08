@@ -1,1 +1,10 @@
 .env
+
+# Go
+/internships
+/cmd/internships/internships
+*.test
+*.out
+
+# OS
+.DS_Store
