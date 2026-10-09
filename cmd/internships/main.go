@@ -12,6 +12,45 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Job titles we consider relevant. Case-insensitive substring match.
+var devopsKeywords = []string{
+	"devops",
+	"dev ops",
+	"site reliability",
+	"sre",
+	"platform engineer",
+	"infrastructure engineer",
+	"cloud engineer",
+	"kubernetes",
+	"terraform",
+	"observability",
+}
+
+var securityKeywords = []string{
+	"security engineer",
+	"security analyst",
+	"appsec",
+	"application security",
+	"cloud security",
+	"infosec",
+	"information security",
+	"penetration test",
+	"pentest",
+	"grc",
+	"compliance engineer",
+	"iam engineer",
+}
+
+// Titles containing these words are excluded even if they match above.
+// This drops senior roles you almost certainly can't get yet.
+var excludeKeywords = []string{
+	"senior",
+	"principal",
+	"manager",
+	"director",
+	"head of",
+	"vp ",
+}
 // ─── METRIC 1: jobs found ──────────────────────────────
 var jobsFound = promauto.NewCounterVec(
 	prometheus.CounterOpts{
@@ -50,6 +89,34 @@ type greenhouseResponse struct {
 	} `json:"jobs"`
 }
 
+type matchResult struct {
+	Category string // "devops", "security", or "" for no match
+}
+
+func classify(title string) matchResult {
+	lower := strings.ToLower(title)
+
+	// Exclusions first — if it's senior, we don't care what it's about.
+	for _, ex := range excludeKeywords {
+		if strings.Contains(lower, ex) {
+			return matchResult{}
+		}
+	}
+
+	for _, kw := range devopsKeywords {
+		if strings.Contains(lower, kw) {
+			return matchResult{Category: "devops"}
+		}
+	}
+
+	for _, kw := range securityKeywords {
+		if strings.Contains(lower, kw) {
+			return matchResult{Category: "security"}
+		}
+	}
+
+	return matchResult{}
+}
 func scrapeBoard(slug string) (int, error) {
 	url := fmt.Sprintf("https://boards-api.greenhouse.io/v1/boards/%s/jobs", slug)
 
