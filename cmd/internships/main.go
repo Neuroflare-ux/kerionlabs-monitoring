@@ -1,175 +1,181 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"strings"
+	"text/tabwriter"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// Job titles we consider relevant. Case-insensitive substring match.
-var devopsKeywords = []string{
-	"devops",
-	"dev ops",
-	"site reliability",
-	"sre",
-	"platform engineer",
-	"infrastructure engineer",
-	"cloud engineer",
-	"kubernetes",
-	"terraform",
-	"observability",
-}
+type Board struct{ Source, Slug string }
 
-var securityKeywords = []string{
-	"security engineer",
-	"security analyst",
-	"appsec",
-	"application security",
-	"cloud security",
-	"infosec",
-	"information security",
-	"penetration test",
-	"pentest",
-	"grc",
-	"compliance engineer",
-	"iam engineer",
-}
+func (b Board) ID() string { return b.Source + ":" + b.Slug }
 
-// Titles containing these words are excluded even if they match above.
-// This drops senior roles you almost certainly can't get yet.
-var excludeKeywords = []string{
-	"senior",
-	"principal",
-	"manager",
-	"director",
-	"head of",
-	"vp ",
-}
-// ─── METRIC 1: jobs found ──────────────────────────────
-var jobsFound = promauto.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "internships_jobs_found_total",
-		Help: "Total jobs found per company board.",
-	},
-	[]string{"company"},
-)
-
-// ─── METRIC 2: scrape duration ─────────────────────────
-var scrapeDuration = promauto.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "internships_scrape_duration_seconds",
-		Help:    "Duration of each company board scrape.",
-		Buckets: prometheus.DefBuckets,
-	},
-	[]string{"company"},
-)
-
-// ─── METRIC 3: scrape errors  ← ADD THIS BLOCK ─────────
-var scrapeErrors = promauto.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "internships_scrape_errors_total",
-		Help: "Total scrape errors per company board.",
-	},
-	[]string{"company"},
-)
-
-type greenhouseResponse struct {
-	Jobs []struct {
-		ID       int    `json:"id"`
-		Title    string `json:"title"`
-		Location struct {
-			Name string `json:"name"`
-		} `json:"location"`
-	} `json:"jobs"`
-}
-
-type matchResult struct {
-	Category string // "devops", "security", or "" for no match
-}
-
-func classify(title string) matchResult {
-	lower := strings.ToLower(title)
-
-	// Exclusions first — if it's senior, we don't care what it's about.
-	for _, ex := range excludeKeywords {
-		if strings.Contains(lower, ex) {
-			return matchResult{}
-		}
-	}
-
-	for _, kw := range devopsKeywords {
-		if strings.Contains(lower, kw) {
-			return matchResult{Category: "devops"}
-		}
-	}
-
-	for _, kw := range securityKeywords {
-		if strings.Contains(lower, kw) {
-			return matchResult{Category: "security"}
-		}
-	}
-
-	return matchResult{}
-}
-func scrapeBoard(slug string) (int, error) {
-	url := fmt.Sprintf("https://boards-api.greenhouse.io/v1/boards/%s/jobs", slug)
-
-	start := time.Now()
-	defer func() {
-		scrapeDuration.WithLabelValues(slug).Observe(time.Since(start).Seconds())
-	}()
-
-	resp, err := http.Get(url)
+func loadBoards(path string) ([]Board, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		scrapeErrors.WithLabelValues(slug).Inc()   // ← ADD
-		return 0, err
+		return nil, err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		scrapeErrors.WithLabelValues(slug).Inc()   // ← ADD
-		return 0, fmt.Errorf("status %d", resp.StatusCode)
+	defer f.Close()
+	var boards []Board
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := sc.Text()
+		if i := strings.Index(line, "#"); i >= 0 {
+			line = line[:i]
+		}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		slug := ""
+		if len(parts) == 2 {
+			slug = strings.TrimSpace(parts[1])
+		}
+		if slug == "" || (parts[0] != "greenhouse" && parts[0] != "lever") {
+			log.Printf("skipping bad line in %s: %q", path, line)
+			continue
+		}
+		boards = append(boards, Board{Source: parts[0], Slug: slug})
 	}
-
-	var payload greenhouseResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		scrapeErrors.WithLabelValues(slug).Inc()   // ← ADD
-		return 0, err
-	}
-
-	jobsFound.WithLabelValues(slug).Add(float64(len(payload.Jobs)))
-	return len(payload.Jobs), nil
+	return boards, sc.Err()
 }
+
+func scanAll(store *Store, boards []Board, delay time.Duration) {
+	for i, b := range boards {
+		if i > 0 {
+			time.Sleep(delay) // be polite: one board at a time
+		}
+		start := time.Now()
+		raw, err := fetchBoard(b)
+		scanDuration.WithLabelValues(b.ID()).Observe(time.Since(start).Seconds())
+		if err != nil {
+			scanErrors.WithLabelValues(b.ID()).Inc()
+			log.Printf("%-28s ERROR: %v", b.ID(), err)
+			continue
+		}
+		matches, f := filterJobs(b, raw)
+		added := store.ApplyScan(b.ID(), matches, time.Now())
+		boardJobs.WithLabelValues(b.ID()).Set(float64(f.Total))
+		boardMatches.WithLabelValues(b.ID()).Set(float64(len(matches)))
+		newMatches.Add(float64(added))
+		log.Printf("%-28s %4d jobs -> %3d entry-level -> %3d in-field -> %3d eligible (%d new)",
+			b.ID(), f.Total, f.Entry, f.InField, f.Eligible, added)
+	}
+	if err := store.Save(); err != nil {
+		log.Printf("saving store failed: %v", err)
+	}
+	updateOpenMatches(store.OpenJobs())
+	lastScan.SetToCurrentTime()
+}
+
+func printTable(jobs []Job) {
+	if len(jobs) == 0 {
+		fmt.Println("\nNo matching jobs right now. Check the funnel lines above to see which filter removed them.")
+		return
+	}
+	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(w, "\nELIGIBILITY\tFIELD\tCOMPANY\tTITLE\tLOCATION\tLINK")
+	for _, j := range jobs {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", j.Eligibility, j.Category, j.Company, j.Title, j.Location, j.URL)
+	}
+	w.Flush()
+	fmt.Printf("\n%d matches. REMOTE-CHECK means the posting doesn't state a country: read it before applying.\n", len(jobs))
+}
+
+type pageJob struct {
+	Job
+	New bool
+}
+type pageData struct {
+	Jobs    []pageJob
+	Updated string
+}
+
+var pageTmpl = template.Must(template.New("page").Parse(`<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internship Radar</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:2rem auto;max-width:1100px;padding:0 1rem;background:#111;color:#ddd}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:.5rem;border-bottom:1px solid #333;vertical-align:top}
+a{color:#6cf}.new{background:#2a2;color:#fff;border-radius:4px;padding:0 .4rem;font-size:.75rem}
+.KENYA{color:#6f6}.REMOTE-GLOBAL{color:#6cf}.REMOTE-CHECK{color:#fc6}
+</style></head><body>
+<h1>Internship Radar</h1>
+<p>{{len .Jobs}} open matches. Updated {{.Updated}}. <b>REMOTE-CHECK</b> = no country stated; read the posting before applying.</p>
+<table><tr><th>Eligibility</th><th>Field</th><th>Company</th><th>Title</th><th>Location</th><th>First seen</th></tr>
+{{range .Jobs}}<tr>
+<td class="{{.Eligibility}}">{{.Eligibility}}</td><td>{{.Category}}</td><td>{{.Company}}</td>
+<td><a href="{{.URL}}" rel="noopener noreferrer" target="_blank">{{.Title}}</a> {{if .New}}<span class="new">NEW</span>{{end}}</td>
+<td>{{.Location}}</td><td>{{.FirstSeen.Format "2006-01-02"}}</td></tr>
+{{else}}<tr><td colspan="6">No matches yet. The first scan may still be running.</td></tr>{{end}}
+</table></body></html>`))
 
 func main() {
-	boards := []string{
-		"stripe", "airbnb", "anthropic", "coinbase", "robinhood",
-		"figma", "notion", "databricks", "palantir", "uber",
-		"lyft", "snapchat", "twitter", "reddit", "square",
-		"asana", "slack", "zoom",
+	boardsPath := flag.String("boards", "boards.txt", "file listing boards to scan")
+	dataPath := flag.String("data", "data/jobs.json", "where to keep job state")
+	addr := flag.String("addr", ":8080", "listen address for the web page and /metrics")
+	interval := flag.Duration("interval", 6*time.Hour, "time between scans")
+	delay := flag.Duration("delay", time.Second, "pause between boards")
+	once := flag.Bool("once", false, "scan once, print results, exit")
+	flag.Parse()
+
+	boards, err := loadBoards(*boardsPath)
+	if err != nil {
+		log.Fatalf("reading boards: %v", err)
+	}
+	if len(boards) == 0 {
+		log.Fatalf("no boards in %s", *boardsPath)
+	}
+	store, err := LoadStore(*dataPath)
+	if err != nil {
+		log.Fatalf("loading %s: %v", *dataPath, err)
+	}
+
+	if *once {
+		scanAll(store, boards, *delay)
+		printTable(store.OpenJobs())
+		return
 	}
 
 	go func() {
 		for {
-			for _, slug := range boards {
-				n, err := scrapeBoard(slug)
-				if err != nil {
-					log.Printf("scrape %s failed: %v", slug, err)
-					continue
-				}
-				log.Printf("scrape %s: %d jobs", slug, n)
-			}
-			time.Sleep(6 * time.Hour)
+			scanAll(store, boards, *delay)
+			time.Sleep(*interval)
 		}
 	}()
 
-	http.Handle("/metrics", promhttp.Handler())
-	log.Println("listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/jobs.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(store.OpenJobs())
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		var pj []pageJob
+		for _, j := range store.OpenJobs() {
+			pj = append(pj, pageJob{Job: j, New: time.Since(j.FirstSeen) < 48*time.Hour})
+		}
+		if err := pageTmpl.Execute(w, pageData{Jobs: pj, Updated: time.Now().Format("2006-01-02 15:04")}); err != nil {
+			log.Printf("render: %v", err)
+		}
+	})
+
+	srv := &http.Server{Addr: *addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	log.Printf("listening on %s (page: /, data: /jobs.json, metrics: /metrics)", *addr)
+	log.Fatal(srv.ListenAndServe())
 }
