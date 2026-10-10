@@ -1,0 +1,27 @@
+# One board per line:  source:slug     (source = greenhouse or lever)
+# Find a slug from a company's careers link:
+#   boards.greenhouse.io/stripe  or  job-boards.greenhouse.io/stripe  -> greenhouse:stripe
+#   jobs.lever.co/palantir                                            -> lever:palantir
+# Boards that don't exist just log an error and count in radar_scan_errors_total.
+# Prune this list over time. Lines starting with # are ignored.
+
+# Named as Greenhouse boards in the sources I checked:
+greenhouse:stripe
+greenhouse:airbnb
+greenhouse:vercel
+greenhouse:anthropic
+greenhouse:gitlab
+greenhouse:figma
+greenhouse:duolingo
+greenhouse:databricks
+
+# Unverified guesses - expect some 404s:
+greenhouse:cloudflare
+greenhouse:datadog
+greenhouse:coinbase
+greenhouse:robinhood
+greenhouse:twilio
+greenhouse:mongodb
+greenhouse:okta
+greenhouse:andela
+lever:palantir

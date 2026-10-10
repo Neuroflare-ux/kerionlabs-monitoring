@@ -40,7 +40,9 @@ var (
 	kenyaRe   = regexp.MustCompile(`(?i)\b(kenya|nairobi|mombasa|kisumu|ke)\b`)
 	remoteRe  = regexp.MustCompile(`(?i)\b(remote|anywhere|work from home|wfh|distributed)\b`)
 	globalRe  = regexp.MustCompile(`(?i)\b(worldwide|anywhere|global|globally|international|africa)\b`)
-	restrictRe = regexp.MustCompile(`(?i)\b(us|usa|u\.s|united states|canada|uk|united kingdom|germany|france|spain|ireland|india|brazil|mexico|australia|singapore|japan|netherlands|poland|israel|europe|apac|latam|north america|ny|nyc|ca|tx|wa|ma|il|co|fl|va|dc|nc|ga|az|oh|pa|nj|mn|ut|mi)\b`)
+	emeaRe     = regexp.MustCompile(`(?i)\bemea\b`)
+	fillerRe   = regexp.MustCompile(`(?i)\b(remote|anywhere|work from home|wfh|distributed|or|and|hybrid|only|based|friendly|eligible)\b`)
+	nonLetters = regexp.MustCompile(`[^a-zA-Z]+`)
 )
 
 func isEntryLevel(title string) bool {
@@ -60,7 +62,9 @@ func categorize(title string) Category {
 }
 
 // eligibility decides whether a location is usable from Kenya.
-// It is a heuristic: REMOTE-CHECK means "remote, country unstated".
+// Rule: a remote job is only kept if the location names NOTHING besides "remote"
+// (REMOTE-CHECK), or explicitly says worldwide/Africa/EMEA. Any other place name
+// (a country, a city, a state code) means it is restricted, so it is dropped.
 func eligibility(location string) (Eligibility, bool) {
 	if kenyaRe.MatchString(location) {
 		return EligKenya, true
@@ -71,10 +75,14 @@ func eligibility(location string) (Eligibility, bool) {
 	if globalRe.MatchString(location) {
 		return EligRemoteGlobal, true
 	}
-	if restrictRe.MatchString(location) {
-		return "", false
+	if emeaRe.MatchString(location) {
+		return EligRemoteCheck, true
 	}
-	return EligRemoteCheck, true
+	rest := nonLetters.ReplaceAllString(fillerRe.ReplaceAllString(location, " "), "")
+	if rest == "" {
+		return EligRemoteCheck, true
+	}
+	return "", false
 }
 
 type Funnel struct{ Total, Entry, InField, Eligible int }
