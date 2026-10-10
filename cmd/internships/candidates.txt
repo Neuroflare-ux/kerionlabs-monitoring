@@ -1,0 +1,59 @@
+# Guesses, one company slug per line. Most will not exist: the probe skips those silently.
+# Slugs are usually the lowercase company name with no spaces.
+
+# Africa-focused companies (guesses)
+flutterwave
+paystack
+moniepoint
+cellulant
+mkopa
+tala
+branch
+wasoko
+twiga
+sendy
+copia
+jumia
+interswitch
+chipper
+kuda
+piggyvest
+andela
+apolloagriculture
+gro-intelligence
+mpesa
+
+# Remote-first / hire-worldwide style companies (guesses)
+automattic
+zapier
+hotjar
+toptal
+deel
+remote
+oysterhr
+hashicorp
+elastic
+canonical
+mozilla
+duckduckgo
+buffer
+doist
+netlify
+sourcegraph
+grafanalabs
+posthog
+supabase
+cockroachlabs
+confluent
+hubspot
+shopify
+wise
+revolut
+monzo
+
+# Global firms that may hire in Nairobi (guesses)
+visa
+mastercard
+thoughtworks
+ibm
+oracle

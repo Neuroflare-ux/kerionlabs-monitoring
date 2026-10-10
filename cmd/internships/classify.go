@@ -13,6 +13,7 @@ const (
 	CatSecurity    Category = "security"
 	CatITSupport   Category = "it-support"
 	CatSoftware    Category = "software"
+	CatOther       Category = "other" // only appears in -loose mode
 
 	EligKenya        Eligibility = "KENYA"
 	EligRemoteGlobal Eligibility = "REMOTE-GLOBAL"
@@ -85,26 +86,43 @@ func eligibility(location string) (Eligibility, bool) {
 	return "", false
 }
 
-type Funnel struct{ Total, Entry, InField, Eligible int }
+// looseMode keeps every job with a usable location, whatever its title.
+var looseMode bool
+
+type NearMiss struct{ Title, Location string }
+
+type Funnel struct {
+	Total, Entry, InField, Eligible int
+	NearMisses                      []NearMiss // passed title + field, failed location
+}
 
 func filterJobs(b Board, raw []RawJob) ([]Job, Funnel) {
 	f := Funnel{Total: len(raw)}
 	var out []Job
 	for _, r := range raw {
-		if !isEntryLevel(r.Title) {
-			continue
-		}
-		f.Entry++
+		entry := isEntryLevel(r.Title)
 		cat := categorize(r.Title)
-		if cat == "" {
+		strict := entry && cat != "" // the original title + field test
+		if entry {
+			f.Entry++
+		}
+		if strict {
+			f.InField++
+		}
+		if !looseMode && !strict {
 			continue
 		}
-		f.InField++
 		elig, ok := eligibility(r.Location)
 		if !ok {
+			if strict {
+				f.NearMisses = append(f.NearMisses, NearMiss{Title: r.Title, Location: r.Location})
+			}
 			continue
 		}
 		f.Eligible++
+		if cat == "" {
+			cat = CatOther
+		}
 		out = append(out, Job{
 			Key:         b.ID() + ":" + r.ID,
 			Board:       b.ID(),
@@ -114,13 +132,14 @@ func filterJobs(b Board, raw []RawJob) ([]Job, Funnel) {
 			URL:         r.URL,
 			Category:    cat,
 			Eligibility: elig,
+			Entry:       entry,
 		})
 	}
 	return out, f
 }
 
 var eligRank = map[Eligibility]int{EligKenya: 0, EligRemoteGlobal: 1, EligRemoteCheck: 2}
-var catRank = map[Category]int{CatCloudDevOps: 0, CatSecurity: 1, CatITSupport: 2, CatSoftware: 3}
+var catRank = map[Category]int{CatCloudDevOps: 0, CatSecurity: 1, CatITSupport: 2, CatSoftware: 3, CatOther: 4}
 
 // sortJobs: Kenya first, then best-fit field, then company and title.
 func sortJobs(jobs []Job) {
@@ -128,6 +147,9 @@ func sortJobs(jobs []Job) {
 		a, b := jobs[i], jobs[j]
 		if eligRank[a.Eligibility] != eligRank[b.Eligibility] {
 			return eligRank[a.Eligibility] < eligRank[b.Eligibility]
+		}
+		if a.Entry != b.Entry {
+			return a.Entry // entry-level first
 		}
 		if catRank[a.Category] != catRank[b.Category] {
 			return catRank[a.Category] < catRank[b.Category]

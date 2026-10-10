@@ -1,27 +1,32 @@
-# One board per line:  source:slug     (source = greenhouse or lever)
+# One board per line:  source:slug     (source = greenhouse, lever or ashby)
 # Find a slug from a company's careers link:
-#   boards.greenhouse.io/stripe  or  job-boards.greenhouse.io/stripe  -> greenhouse:stripe
-#   jobs.lever.co/palantir                                            -> lever:palantir
-# Boards that don't exist just log an error and count in radar_scan_errors_total.
-# Prune this list over time. Lines starting with # are ignored.
+#   boards.greenhouse.io/stripe  or  job-boards.greenhouse.io/stripe -> greenhouse:stripe
+#   jobs.lever.co/palantir                                           -> lever:palantir
+#   jobs.ashbyhq.com/notion                                          -> ashby:notion
+# Lines starting with # are ignored. A board that doesn't exist logs an error.
 
-# Named as Greenhouse boards in the sources I checked:
+# Boards your probe found, with jobs usable from Kenya:
+greenhouse:moniepoint
+greenhouse:mozilla
+greenhouse:netlify
+greenhouse:jumia
+lever:apolloagriculture
+lever:toptal
+
+# Boards found earlier (big US firms: mostly on-site, kept for comparison):
 greenhouse:stripe
 greenhouse:airbnb
 greenhouse:vercel
-greenhouse:anthropic
 greenhouse:gitlab
 greenhouse:figma
-greenhouse:duolingo
 greenhouse:databricks
-
-# Unverified guesses - expect some 404s:
 greenhouse:cloudflare
 greenhouse:datadog
-greenhouse:coinbase
-greenhouse:robinhood
-greenhouse:twilio
 greenhouse:mongodb
-greenhouse:okta
-greenhouse:andela
 lever:palantir
+
+# Ashby boards named in the sources I checked (field names from memory: verify):
+ashby:notion
+ashby:linear
+ashby:ramp
+ashby:openai

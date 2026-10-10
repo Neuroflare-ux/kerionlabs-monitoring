@@ -18,6 +18,7 @@ type Job struct {
 	URL         string      `json:"url"`
 	Category    Category    `json:"category"`
 	Eligibility Eligibility `json:"eligibility"`
+	Entry       bool        `json:"entry"`
 	FirstSeen   time.Time   `json:"first_seen"`
 	LastSeen    time.Time   `json:"last_seen"`
 	Open        bool        `json:"open"`
@@ -76,6 +77,7 @@ func (s *Store) ApplyScan(board string, matches []Job, now time.Time) int {
 		if old, ok := s.Jobs[m.Key]; ok {
 			old.Title, old.Location, old.URL = m.Title, m.Location, m.URL
 			old.Category, old.Eligibility = m.Category, m.Eligibility
+			old.Entry = m.Entry
 			old.LastSeen, old.Open = now, true
 			continue
 		}

@@ -41,6 +41,8 @@ func fetchBoard(b Board) ([]RawJob, error) {
 		return fetchGreenhouse(b.Slug)
 	case "lever":
 		return fetchLever(b.Slug)
+	case "ashby":
+		return fetchAshby(b.Slug)
 	}
 	return nil, fmt.Errorf("unknown source %q", b.Source)
 }
@@ -97,6 +99,32 @@ func fetchLever(slug string) ([]RawJob, error) {
 			loc += " (Remote) " + j.Country
 		}
 		out = append(out, RawJob{ID: j.ID, Title: j.Text, Location: loc, URL: j.HostedURL})
+	}
+	return out, nil
+}
+
+// Ashby public posting API. Field names are written from memory: check them with -probe.
+func fetchAshby(slug string) ([]RawJob, error) {
+	var p struct {
+		Jobs []struct {
+			ID       string `json:"id"`
+			Title    string `json:"title"`
+			Location string `json:"location"`
+			IsRemote bool   `json:"isRemote"`
+			JobURL   string `json:"jobUrl"`
+		} `json:"jobs"`
+	}
+	endpoint := "https://api.ashbyhq.com/posting-api/job-board/" + url.PathEscape(slug)
+	if err := getJSON(endpoint, &p); err != nil {
+		return nil, err
+	}
+	out := make([]RawJob, 0, len(p.Jobs))
+	for _, j := range p.Jobs {
+		loc := j.Location
+		if j.IsRemote {
+			loc += " (Remote)"
+		}
+		out = append(out, RawJob{ID: j.ID, Title: j.Title, Location: loc, URL: j.JobURL})
 	}
 	return out, nil
 }
