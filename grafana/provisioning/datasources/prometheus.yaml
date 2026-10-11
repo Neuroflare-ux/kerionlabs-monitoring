@@ -1,11 +1,13 @@
-global:
-  scrape_interval: 15s
+apiVersion: 1
 
-scrape_configs:
-  - job_name: prometheus
-    static_configs:
-      - targets: ["localhost:9090"]
-
-  - job_name: node
-    static_configs:
-      - targets: ["host.docker.internal:9100"]
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+    editable: true
