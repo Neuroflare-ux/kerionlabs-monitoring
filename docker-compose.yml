@@ -44,7 +44,17 @@ services:
       - grafana
       - prometheus
     restart: unless-stopped  
-    
+  
+  internships:
+    build:
+      context: .
+      dockerfile: cmd/internships/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./cmd/internships/data:/app/data
+      - ./cmd/internships/boards.txt:/app/boards.txt:ro
+    restart: unless-stopped
 volumes:
   prom_data:
   grafana_data:
