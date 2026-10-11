@@ -13,7 +13,7 @@
       "type": "stat",
       "title": "Total jobs tracked",
       "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "refId": "A", "expr": "sum(radar_board_jobs)", "legendFormat": "__auto" }
       ],
@@ -28,7 +28,7 @@
       "type": "stat",
       "title": "Seconds since last scan",
       "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "refId": "A", "expr": "time() - radar_last_scan_timestamp_seconds", "legendFormat": "__auto" }
       ],
@@ -43,7 +43,7 @@
       "type": "stat",
       "title": "Failing boards",
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "refId": "A", "expr": "count(radar_scan_errors_total > 0) or vector(0)", "legendFormat": "__auto" }
       ],
@@ -58,7 +58,7 @@
       "type": "stat",
       "title": "Total matched jobs",
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         { "refId": "A", "expr": "sum(radar_board_matches)", "legendFormat": "__auto" }
       ],
