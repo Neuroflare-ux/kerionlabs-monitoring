@@ -38,9 +38,9 @@ var categoryRules = []struct {
 }
 
 var (
-	kenyaRe   = regexp.MustCompile(`(?i)\b(kenya|nairobi|mombasa|kisumu|ke)\b`)
-	remoteRe  = regexp.MustCompile(`(?i)\b(remote|anywhere|work from home|wfh|distributed)\b`)
-	globalRe  = regexp.MustCompile(`(?i)\b(worldwide|anywhere|global|globally|international|africa)\b`)
+	kenyaRe    = regexp.MustCompile(`(?i)\b(kenya|nairobi|mombasa|kisumu|ke)\b`)
+	remoteRe   = regexp.MustCompile(`(?i)\b(remote|anywhere|work from home|wfh|distributed)\b`)
+	globalRe   = regexp.MustCompile(`(?i)\b(worldwide|anywhere|global|globally|international|africa)\b`)
 	emeaRe     = regexp.MustCompile(`(?i)\bemea\b`)
 	fillerRe   = regexp.MustCompile(`(?i)\b(remote|anywhere|work from home|wfh|distributed|or|and|hybrid|only|based|friendly|eligible)\b`)
 	nonLetters = regexp.MustCompile(`[^a-zA-Z]+`)
