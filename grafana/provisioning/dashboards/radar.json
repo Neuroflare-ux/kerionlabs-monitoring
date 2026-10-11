@@ -1,0 +1,72 @@
+{
+  "uid": "internship-radar",
+  "title": "Internships Radar",
+  "tags": ["internships", "radar"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total jobs tracked",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(radar_board_jobs)", "legendFormat": "__auto" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Seconds since last scan",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "time() - radar_last_scan_timestamp_seconds", "legendFormat": "__auto" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Failing boards",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "count(radar_scan_errors_total > 0) or vector(0)", "legendFormat": "__auto" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total matched jobs",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(radar_board_matches)", "legendFormat": "__auto" }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      }
+    }
+  ]
+}
